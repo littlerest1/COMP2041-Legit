@@ -37,11 +37,16 @@ if($ARGV[0] eq "add"){
 if($ARGV[0] eq "commit"){
 	checkinit();
 	checkindex();
-	if($ARGV[1] ne "-m" || $#ARGV != 2){
+	if($ARGV[1] eq "-m" && $#ARGV == 2){
+        commit();	
+	}
+	elsif($ARGV[1] eq "-a" && $ARGV[2] eq "-m" && $#ARGV == 3){
+        commitAll();	
+	}
+	else{
 		print "usage: legit.pl commit [-a] -m commit-message\n";
 		exit 1;
 	}
-	commit();
 }
 
 if($ARGV[0] eq "show"){
@@ -84,10 +89,12 @@ sub checkrepo{
 }
 
 sub checkindex{
-	if(-z ".legit/index"){
+    opendir(my $dh, ".legit/index") or die "Not a directory";
+	if(scalar(grep { $_ ne "." && $_ ne ".." } readdir($dh)) == 0){
 		print "nothing to commit\n";
 		exit 1;
 	}
+			
 	return;
 }
 #init function creates folder:.legit/index/log.txt/repository
@@ -342,4 +349,8 @@ sub show{
 		}
 	}
 	return;
+}
+
+sub commitAll{
+    return;
 }
