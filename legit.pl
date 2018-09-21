@@ -35,12 +35,14 @@ if($ARGV[0] eq "add"){
 }
 
 if($ARGV[0] eq "commit"){
-	checkinit();
-	checkindex();
 	if($ARGV[1] eq "-m" && $#ARGV == 2){
+		checkinit();
+		checkindex();	
         commit();	
 	}
 	elsif($ARGV[1] eq "-a" && $ARGV[2] eq "-m" && $#ARGV == 3){
+		checkinit();
+		checkindex();
         commitAll();	
 	}
 	else{
@@ -169,7 +171,12 @@ sub commit{
 			copy($file,".legit/repository/Commit0") or die "legit.pl: error: could not copy '$file'\n";
 		}
 		open my $fh, '>', ".legit/log.txt" or die "Could no open log.txt\n";
-		print $fh "0 $ARGV[2]\n";
+		if($#ARGV == 3){
+			print $fh "0 $ARGV[3]\n";
+		}
+		elsif($#ARGV == 2){
+			print $fh "0 $ARGV[2]\n";
+		}
 		print "Committed as commit 0\n";
 		close $fh;
 		return;
@@ -206,6 +213,11 @@ sub commit{
 				exit 1;
 			}
 			
+			my $commit = ".legit/repository/Commit$count";
+				unless(mkdir($commit)) {
+				die "Unable to create $commit$count\n";
+			}
+			
 			foreach my $file (glob("$directory/*")){
 				my @files = split ('/',$file);
 				my $filename = $files[$#files];
@@ -214,10 +226,6 @@ sub commit{
 					next;
 				}
 				else{
-					my $commit = ".legit/repository/Commit$count";
-						unless(mkdir($commit)) {
-						die "Unable to create $commit$count\n";
-					}
 					copy($file,".legit/repository/Commit$count") or die "legit.pl: error: could not copy '$file'\n";	
 					$flag = 1;
 				}
@@ -225,7 +233,12 @@ sub commit{
 			if($flag == 1){
 				open my $in, '<', ".legit/log.txt" or die "Could no open log.txt\n";
 				open my $out, '>', ".legit/log.txt.temp" or die "Can't write new file: $!";
-				print $out "$count $ARGV[2]\n";
+				if($#ARGV == 3){
+					print $out "$count $ARGV[3]\n";
+				}
+				elsif($#ARGV == 2){
+					print $out "$count $ARGV[2]\n";
+				}
 				while (my $line = <$in>){
 					print $out "$line";
 				}
@@ -352,5 +365,14 @@ sub show{
 }
 
 sub commitAll{
+	foreach my $file((glob(".legit/index/*"))){
+		my @files = split ('/',$file);
+		my $filename = $files[$#files];
+		#print "$filename\n";
+		if(-e "$filename"){
+			copy($filename,".legit/index/$filename") or die "legit.pl: error: could not copy '$filename'\n";
+		}
+	}
+	commit();
     return;
 }
