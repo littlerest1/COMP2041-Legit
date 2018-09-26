@@ -25,16 +25,16 @@ if($#ARGV <= -1){
 	exit 1;
 }
 
-if($ARGV[0] eq "init"){
+elsif($ARGV[0] eq "init"){
 	Initialize();
 }
 
-if($ARGV[0] eq "add"){
+elsif($ARGV[0] eq "add"){
 	checkinit();
 	addFile();
 }
 
-if($ARGV[0] eq "commit"){
+elsif($ARGV[0] eq "commit"){
 	if($ARGV[1] eq "-m" && $#ARGV == 2){
 		checkinit();
 		checkindex();	
@@ -51,7 +51,7 @@ if($ARGV[0] eq "commit"){
 	}
 }
 
-if($ARGV[0] eq "show"){
+elsif($ARGV[0] eq "show"){
 	checkinit();
 	checkrepo();
 	if($#ARGV != 1){
@@ -61,25 +61,23 @@ if($ARGV[0] eq "show"){
 	show();
 }
 
-if($ARGV[0] eq "log"){
+elsif($ARGV[0] eq "log"){
 	checkinit();
 	checkrepo();
 	printCommit();
 }
 
-if($ARGV[0] eq "rm"){
+elsif($ARGV[0] eq "rm"){
 	checkinit();
 	checkrepo();
 	if($#ARGV == 0){
 		print "legit.pl: error: internal error usage: git rm [<options>] [--] <file>...
-
     -n, --dry-run         dry run
     -q, --quiet           do not list removed files
     --cached              only remove from the index
     -f, --force           override the up-to-date check
     -r                    allow recursive removal
     --ignore-unmatch      exit with a zero status even if nothing matched
-
  
 You are not required to detect this error or produce this error message.\n";
 	exit 1;
@@ -87,8 +85,38 @@ You are not required to detect this error or produce this error message.\n";
 	remove();
 
 }
+else{
+	print "Usage: legit.pl <command> [<args>]\n\n";
+	print "These are the legit commands:\n";
+	print "   init       Create an empty legit repository
+   add        Add file contents to the index
+   commit     Record changes to the repository
+   log        Show commit log
+   show       Show file at particular state
+   rm         Remove files from the current directory and from the index
+   status     Show the status of files in the current directory, index, and repository
+   branch     list, create or delete a branch
+   checkout   Switch branches or restore current directory files
+   merge      Join two development histories together\n\n";
+	exit 1;
+}
 #functions for each command
 
+#get the current repository
+sub getRepo{
+	my $firstLine;
+	foreach my $dir(glob(".legit/repository/*")){
+		#print "$dir\n";
+		$firstLine = $dir;
+	}
+	my @input = split ('_',$firstLine);
+	#	print "@input\n";
+	my $curr = 0;
+	if($input[1] ne ""){
+		$curr = $input[1];
+	}
+	return $curr;
+}
 #check whether initialize legit or not
 sub checkinit{
 	if(-e ".legit"){
@@ -144,8 +172,14 @@ sub Initialize{
 	
 	my $repository = ".legit/repository";
 	unless(mkdir($repository)) {
-        die "Unable to create $index\n";
+        die "Unable to create $repository\n";
     }
+	
+	my $bin = ".legit/bin";
+	unless(mkdir($bin)) {
+        die "Unable to create $bin\n";
+    }
+	
 	return;
 }
 
@@ -161,7 +195,7 @@ sub addFile{
 		}
 		my $args = 1;
 		while($args <= $#ARGV){
-			#print "$ARGV[$args]\n";	
+			#print "$ARGV[$args],$#ARGV,$args\n";	
 			if(-d $ARGV[$args]){
 				print "legit.pl: error: '$ARGV[$args]' is not a regular file\n";
 				exit 1;
@@ -170,13 +204,14 @@ sub addFile{
 				copy($ARGV[$args],$directory) or die "legit.pl: error: can not open '$ARGV[$args]'\n";
 			}
 			elsif(-e ".legit/index/$ARGV[$args]"){
+			#	print "unlink\n";
+				copy(".legit/index/$ARGV[$args]",".legit/bin/$ARGV[$args]") or die "legit.pl: error: can not open '/bin/$ARGV[$args]'\n";
 			    unlink ".legit/index/$ARGV[$args]";
-				#next;
 			}
             else{
 				print "legit.pl: error: can not open '$ARGV[$args]'\n";
 			}
-			$args += $args;
+			$args ++;
 		}
 	}
 	else{
@@ -191,13 +226,13 @@ sub commit{
 	#print "message:$ARGV[2]\n";
 	
 	if(-z ".legit/log.txt"){
-		my $commit = ".legit/repository/Commit0";
+		my $commit = ".legit/repository/Commit_0";
 		unless(mkdir($commit)) {
 			die "Unable to create $commit\n";
 		}
 		my $directory = ".legit/index";
 		foreach my $file (glob("$directory/*")){
-			copy($file,".legit/repository/Commit0") or die "legit.pl: error: could not copy '$file'\n";
+			copy($file,".legit/repository/Commit_0") or die "legit.pl: error: could not copy '$file'\n";
 		}
 		open my $fh, '>', ".legit/log.txt" or die "Could no open log.txt\n";
 		if($#ARGV == 3){
@@ -212,27 +247,23 @@ sub commit{
 	}
 	else{	
 		my $flag = 0;
-		open my $fh, '<', ".legit/log.txt" or die "Could no open log.txt\n";
 		my $firstLine;
-		my $count = 0;
-		while( my $line = <$fh> ) {
-			if($count == 0){
-				$firstLine = $line;
-			}
-			$count ++;
+		foreach my $dir(glob(".legit/repository/*")){
+			#print "$dir\n";
+			$firstLine = $dir;
 		}
-		my @input = split (' ',$firstLine);
-		$count = 0;
+		my @input = split ('_',$firstLine);
+	#	print "@input\n";
+		my $count = 0;
 		my $curr = 0;
-		if($input[0] ne ""){
-			$curr = $input[0];
+		if($input[1] ne ""){
+			$curr = $input[1];
 		}
 
 		if(looks_like_number($curr)){
 			$count = $curr + 1;
 		}
-		close $fh;
-		
+
 		my $directory = ".legit/index";
 		if(-e $directory){
 			opendir(my $dh, $directory) or die "Not a directory";
@@ -242,45 +273,44 @@ sub commit{
 				exit 1;
 			}
 			
-			my $commit = ".legit/repository/Commit$count";
+			my $commit = ".legit/repository/Commit_$count";
 				unless(mkdir($commit)) {
-				die "Unable to create $commit$count\n";
+				die "Unable to create $commit\n";
 			}
 			
 			my $num = $curr;
-			while($num >= 0){
-				foreach my $file(glob(".legit/repository/Commit$num/*")){
-				#	print "loop\n";
-					my @files = split '/',$file;
-					if(-e ".legit/index/$files[$#files]"){
-						#print "find\n";
-						next;
-					}
-					else{
-						unlink ".legit/repository/Commit$num/$files[$#files]";
-					#	copy($a,".legit/repository/Commit$count") or die "legit.pl: error: could not copy '$a'\n";
-						$flag = 1;
-						#last;
-					}
-				
-				}
-				$num --;
-			}
-			
-			if($flag == 0){
-				foreach my $file (glob("$directory/*")){
+			foreach my $file (glob("$directory/*")){
 					my @files = split ('/',$file);
 					my $filename = $files[$#files];
-					#print "$filename\n";
-					if(checksame($filename,$input[0]) == 1){
+				#	print "$filename\n";
+					if(checksame($filename,$input[1]) == 1){
 						next;
 					}
 					else{
 						foreach my $a (glob("$directory/*")){
-							copy($a,".legit/repository/Commit$count") or die "legit.pl: error: could not copy '$a'\n";
+							copy($a,".legit/repository/Commit_$count") or die "legit.pl: error: could not copy '$a'\n";
 						}
 						$flag = 1;
 						last;
+					}
+			}
+			if($flag == 0){
+				#print "efoeneio\n";
+				#print "$curr\n";
+				foreach my $file(glob(".legit/repository/Commit_$curr/*")){
+				#	print "$curr\n";
+					my @files = split ('/',$file);
+					my $filename = $files[$#files];
+					if(-e ".legit/index/$filename"){
+						#print ".legit/index/$filename\n";
+						next;
+					}
+					else{
+						foreach my $a (glob("$directory/*")){
+							copy($a,".legit/repository/Commit_$count") or die "legit.pl: error: could not copy '$a'\n";
+						}
+						#print "$filename\n";
+						$flag = 1;
 					}
 				}
 			}
@@ -302,7 +332,7 @@ sub commit{
 				print "Committed as commit $count\n";	
 			}
 			else{
-				rmdir ".legit/repository/Commit$count";
+				rmdir ".legit/repository/Commit_$count";
 				print "nothing to commit\n";
 				exit 1;
 			}
@@ -317,18 +347,12 @@ sub checksame{
 	my $commits = ".legit/repository";
 	my $count = 0;
 	
-	while($count <= $_[1]){
-		foreach my $file (glob("$commits/Commit$count/*")){
-			my @files = split ('/',$file);
-			my $filename = $files[$#files];
-			if($filename eq $_[0]){
-				if(compare(".legit/index/$filename",".legit/repository/Commit$count/$filename") == 0){
-					return 1;
-				}
-			}
+	if(-e "$commits/Commit_$_[1]/$_[0]"){
+		if(compare(".legit/index/$_[0]",".legit/repository/Commit_$_[1]/$_[0]") == 0){
+			return 1;
 		}
-		$count ++;
 	}
+
 	return 0;
 
 }
@@ -361,12 +385,12 @@ sub show{
 	#print "$args[1]\n";
 	if(looks_like_number($args[0])){
 		#print "$args[0]\n";
-		if(!(-e ".legit/repository/Commit$args[0]")){
+		if(!(-e ".legit/repository/Commit_$args[0]")){
 			print "legit.pl: error: unknown commit '$args[0]'\n";
 			exit 1;
 		}
-		if(-e ".legit/repository/Commit$args[0]/$args[1]"){
-			open my $fh,'<',".legit/repository/Commit$args[0]/$args[1]" or die "Could not open .legit/repository/Commit$args[0]/$args[1]\n";
+		if(-e ".legit/repository/Commit_$args[0]/$args[1]"){
+			open my $fh,'<',".legit/repository/Commit_$args[0]/$args[1]" or die "Could not open .legit/repository/Commit_$args[0]/$args[1]\n";
 			while(my $line = <$fh>){
 				print "$line";
 			}
@@ -427,11 +451,11 @@ sub remove{
 	}
 	#cached and force request remove the file from index folder without checking differences
 	if($flag == 1 && $f2 == 1){
-		print "$ARGV[$#ARGV]\n";
+		#print "$ARGV[$#ARGV]\n";
 		my $count = 3;
 		while($count <= $#ARGV){
 			if(-e ".legit/index/$ARGV[$count]"){
-				print "$ARGV[$count]\n";
+				#print "$ARGV[$count]\n";
 				unlink ".legit/index/$ARGV[$count]";
 			}
 			else{
@@ -452,7 +476,7 @@ sub remove{
 				}
 			}
 			else{
-				print "legit.pl: error: '$ARGV[$count]' is not in the legit repository\n;";
+				print "legit.pl: error: '$ARGV[$count]' is not in the legit repository\n";
 				exit 1;
 			}
 			$count ++;
@@ -464,8 +488,8 @@ sub remove{
 		while($count <= $#ARGV){
 			if(-e ".legit/index/$ARGV[$count]"){
 					#print "here\n";
-				if(DiffCI($ARGV[$count]) == 1){
-					print "legit.pl: error: '$ARGV[$count]' in repository is different to working file\n";
+				if(DiffIR($ARGV[$count]) == 0 && DiffCI($ARGV[$count]) == 1){
+					print "legit.pl: error: '$ARGV[$count]' in index is different to both working file and repository\n";
 					exit 1;
 				}
 				else{
@@ -484,14 +508,15 @@ sub remove{
 		my $count = 1;
 		while($count <= $#ARGV){
 			if(-e ".legit/index/$ARGV[$count]"){
+				#print "here\n";
 				if(InRepo($ARGV[$count]) == 1){
 					#print "here\n";
-					if(DiffIR($ARGV[$count]) == 0){
-						print "legit.pl: error: '$ARGV[$count]' has changes staged in the index\n";
+					if(DiffIR($ARGV[$count]) == 0 && DiffCI($ARGV[$count]) == 1){
+						print "legit.pl: error: '$ARGV[$count]' in index is different to both working file and repository\n";
 						exit 1;
 					}
-					elsif(DiffIR($ARGV[$count]) == 0 && DiffCI($ARGV[$count]) == 0){
-						print "legit.pl: error: '$ARGV[$count]' in index is different to both working file and repository\n";
+					elsif(DiffIR($ARGV[$count]) == 0){
+						print "legit.pl: error: '$ARGV[$count]' has changes staged in the index\n";
 						exit 1;
 					}
 					elsif(DiffIR($ARGV[$count]) == 1 && DiffCI($ARGV[$count]) == 1){
@@ -520,19 +545,17 @@ sub remove{
 
 sub DiffIR{
 	if(-e ".legit/index/$_[0]"){
-		open my $fh, '<', ".legit/log.txt" or die "Could no open log.txt\n";
 		my $firstLine;
-		my $count = 0;
-		while( my $line = <$fh> ) {
-			if($count == 0){
-				$firstLine = $line;
-			}
-			$count ++;
+		foreach my $dir(glob(".legit/repository/*")){
+			#print "$dir\n";
+			$firstLine = $dir;
 		}
-		my @input = split (' ',$firstLine);
+		my @input = split ('_',$firstLine);
+		#print "@input\n";
+		my $count = 0;
 		my $curr = 0;
-		if($input[0] ne ""){
-			$curr = $input[0];
+		if($input[1] ne ""){
+			$curr = $input[1];
 		}
 		return checksame($_[0],$curr);
 	}
@@ -540,29 +563,23 @@ sub DiffIR{
 }
 sub InRepo{
 	#print "$_[0]\n";
-	open my $fh, '<', ".legit/log.txt" or die "Could no open log.txt\n";
 	my $firstLine;
-	my $count = 0;
-	while( my $line = <$fh> ) {
-		if($count == 0){
-			$firstLine = $line;
-		}
-		$count ++;
+	foreach my $dir(glob(".legit/repository/*")){
+		#print "$dir\n";
+		$firstLine = $dir;
 	}
-	my @input = split (' ',$firstLine);
+	my @input = split ('_',$firstLine);
+	#	print "@input\n";
 	my $curr = 0;
-	if($input[0] ne ""){
-		$curr = $input[0];
+	if($input[1] ne ""){
+		$curr = $input[1];
 	}
 
-	while($curr >= 0){
-		foreach my $file(glob(".legit/repository/Commit$curr/*")){
-			my @files = split '/',$file;
-			if($files[3] eq $_[0]){
-				return 1;
-			}
+	foreach my $file(glob(".legit/repository/Commit_$curr/*")){
+		my @files = split '/',$file;
+		if($files[3] eq $_[0]){
+			return 1;
 		}
-		$curr --;
 	}
 	return 0;
 }
