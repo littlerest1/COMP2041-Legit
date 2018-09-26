@@ -67,6 +67,24 @@ elsif($ARGV[0] eq "log"){
 	printCommit();
 }
 
+elsif($ARGV[0] eq "branch"){
+	checkinit();
+	checkrepo();
+	if($#ARGV == 0){
+		printBranch();
+	}
+	elsif($#ARGV == 1){
+		createBranch($ARGV[1]);
+	}
+	elsif($#ARGV == 2 && $ARGV[1] eq "-d"){
+		deleteBranch($ARGV[2]);
+	}
+	else{
+		print "usage: legit.pl branch [-d] <branch>\n";
+		exit 1;
+	}
+}
+
 elsif($ARGV[0] eq "rm"){
 	checkinit();
 	checkrepo();
@@ -176,6 +194,12 @@ sub Initialize{
 	}
 	close(FH);
 	
+	my $branch = '.legit/branch.txt';
+	unless(open BR, '>'.$branch) {
+		die "\nUnable to create $branch\n";
+	}
+	close(BR);
+	
 	my $index = ".legit/index";
 	unless(mkdir($index)) {
         die "Unable to create $index\n";
@@ -190,6 +214,7 @@ sub Initialize{
 	unless(mkdir($bin)) {
         die "Unable to create $bin\n";
     }
+	
 	print "Initialized empty legit repository in .legit\n";
 	return;
 }
@@ -268,7 +293,7 @@ sub commit{
 			copy($file,".legit/repository/Commit_0") or die "legit.pl: error: could not copy '$file'\n";
 		}
 		
-		open my $fh, '>', ".legit/log.txt" or die "Could no open log.txt\n";
+		open my $fh, '>', ".legit/log.txt" or die "Could not open log.txt\n";
 		if($#ARGV == 3){
 			print $fh "0 $ARGV[3]\n";
 		}
@@ -277,6 +302,11 @@ sub commit{
 		}
 		print "Committed as commit 0\n";
 		close $fh;
+		
+		open my $br,'>',".legit/branch.txt" or die "Could not open branch.txt\n";
+		print $br "1 - master:Commit_0\n";
+		close $br;
+		
 		return;
 	}
 	else{	
@@ -790,5 +820,140 @@ sub status{
 		print "$output";
 	}
 	close $out;
+	return;
+}
+
+sub printBranch{
+	open my $br,'<',".legit/branch.txt" or die "Could not open branch.txt\n";
+	
+	while(my $line = <$br>){
+		my @act = split(':',$line);
+		if($act[0] =~ m/ - /){
+			my @cho = split(' - ',$act[0]);
+			print "$cho[1]\n";
+		}
+		else{
+			print "$act[0]\n";
+		}
+	}
+	close $br;
+	return;
+}
+
+sub existsBranch{
+	open my $br,'<',".legit/branch.txt" or die "Could not open branch.txt\n";
+	
+	while(my $line = <$br>){
+		my @ac = split(':',$line);
+		if($ac[0] =~ m/ - /){
+			my @ch = split(' - ',$ac[0]);
+			if($ch[1] eq $_[0]){
+				close $br;
+				return 1;
+			}
+		}
+		else{
+			if($ac[0] eq $_[0]){
+				close $br;
+				return 1;
+			}
+		}
+	}
+	close $br;
+	return 0;
+}
+sub createBranch{
+	if(existsBranch($_[0]) == 1){
+		print "legit.pl: error: branch '$_[0]' already exists\n";
+		exit 1;
+	} 
+	
+	my $master = "";
+	open(my $FH,'<',".legit/branch.txt") or die "Could not open branch.txt:$!";
+	while(my $line = <$FH>){
+		my @a = split(':',$line);
+		if($a[0] =~ m/ - /){
+			my @c = split(' - ',$a[0]);
+			if($c[1] eq "master"){
+				$master = $a[1];
+				last;
+			}
+		}
+		else{
+			if($a[0] eq "master"){
+				$master = $a[1];
+				last;
+			}
+		}
+	}
+	close $FH;
+	
+	open(my $F,'>>',".legit/branch.txt") or die "Could not open branch.txt:$!";
+	print $F "$_[0]:$master";
+	close $F;
+	
+	my %hash;
+	open my $input,".legit/branch.txt" or die "Could not open branch.txt:$!";
+	#print "second\n";
+	foreach my $line(<$input>){
+		my @BN = split(':',$line);
+		if($BN[0] =~ m/ - /){
+			my @Bname = split(' - ',$BN[0]);
+			$hash{$Bname[1]} = $line;
+		}
+		else{
+			$hash{$BN[0]} = $line;
+		}
+	}
+	close $input;
+
+	open my $out, '>', ".legit/branch.txt.temp" or die "Can't write new file: $!";
+	foreach my $key(sort keys %hash){
+		print $out "$hash{$key}";
+	}
+	close $out;
+	rename (".legit/branch.txt.temp", ".legit/branch.txt") or die "Unable to rename: $!";
+	return;
+}
+
+sub deleteBranch{
+	if(existsBranch($_[0]) == 0){
+		print "legit.pl: error: branch '$_[0]' does not exist\n";
+		exit 1;
+	}
+	
+	if($_[0] eq "master"){
+		print "legit.pl: error: can not delete branch 'master'\n";
+		exit 1;
+	}
+	open my $in, '<', ".legit/branch.txt" or die "Could no open branch.txt\n";
+	open my $out, '>', ".legit/branch.txt.temp" or die "Can't write new file: $!";
+
+	while (my $line = <$in>){
+		my @B = split(':',$line);
+		if($B[0] =~ m/ - /){
+			my @nam = split(' - ',$B[0]);
+			if($nam[1] eq $_[0]){
+				my $current = getcwd;
+				print "legit.pl: error: internal error error: Cannot delete branch '$_[0]' checked out at '$current/.legit'
+ 
+You are not required to detect this error or produce this error message.\n";
+				exit 1;
+			}
+			else{
+				print $out "$line";	
+			}
+		}
+		elsif($B[0] eq $_[0]){
+			next;
+		}
+		else{
+			print $out "$line";
+		}
+	}
+	close $in;
+	close $out;
+	rename (".legit/branch.txt.temp", ".legit/branch.txt") or die "Unable to rename: $!";
+	print "Deleted branch '$_[0]'\n";
 	return;
 }
