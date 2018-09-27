@@ -85,6 +85,17 @@ elsif($ARGV[0] eq "branch"){
 	}
 }
 
+elsif($ARGV[0] eq "checkout"){
+	checkinit();
+	checkrepo();
+	if($#ARGV == 1){
+		switch($ARGV[1]);
+	}
+	else{
+		print "usage: legit.pl checkout <branch>\n";
+		exit 1;
+	}
+}
 elsif($ARGV[0] eq "rm"){
 	checkinit();
 	checkrepo();
@@ -402,6 +413,7 @@ sub commit{
 				close $in;
 				close $out;
 				rename (".legit/log.txt.temp", ".legit/log.txt") or die "Unable to rename: $!";
+				updateBranch($count);
 				print "Committed as commit $count\n";	
 			}
 			else{
@@ -630,11 +642,6 @@ sub remove{
 						print "legit.pl: error: '$ARGV[$count]' in repository is different to working file\n";
 						exit 1;
 					}
-					else{
-						#print "unlink all\n";
-						unlink ".legit/index/$ARGV[$count]";
-						unlink "$ARGV[$count]";
-					}
 				}
 				else{
 					print "legit.pl: error: '$ARGV[$count]' has changes staged in the index\n";
@@ -643,7 +650,15 @@ sub remove{
 			}
 			else{
 				print "legit.pl: error: '$ARGV[$count]' is not in the legit repository\n";
+				exit 1;
 			}
+			$count ++;
+		}
+
+		$count = 1;
+		while($count <= $#ARGV){
+			unlink ".legit/index/$ARGV[$count]";
+			unlink "$ARGV[$count]";
 			$count ++;
 		}
 	}
@@ -652,18 +667,7 @@ sub remove{
 
 sub DiffIR{
 	if(-e ".legit/index/$_[0]"){
-		my $firstLine;
-		foreach my $dir(glob(".legit/repository/*")){
-			#print "$dir\n";
-			$firstLine = $dir;
-		}
-		my @input = split ('_',$firstLine);
-		#print "@input\n";
-		my $count = 0;
-		my $curr = 0;
-		if($input[1] ne ""){
-			$curr = $input[1];
-		}
+		my $curr = getBranch();
 		return checksame($_[0],$curr);
 	}
 	return 0;
@@ -697,6 +701,7 @@ sub DiffCI{
 	}
 	return 1;
 }
+
 
 sub updateS{
 	my $dir = getcwd;
@@ -769,6 +774,7 @@ sub status{
 				#print "$curr\n";
 				if(-e ".legit/repository/Commit_$curr/$cho[0]"){
 				#	print "all in\n";
+
 					if(DiffCI($cho[0]) == 0 && DiffIR($cho[0]) == 0){
 						$line = "$cho[0] - file changed, changes staged for commit\n";
 					}
@@ -777,6 +783,9 @@ sub status{
 					}
 					elsif(DiffCI($cho[0]) == 1 && DiffIR($cho[0]) == 0){
 						$line = "$cho[0] - file changed, different changes staged for commit\n";
+					}
+					else{
+						$line = "$cho[0] - same as repo\n";
 					}
 				}
 				else{
@@ -822,7 +831,25 @@ sub status{
 	close $out;
 	return;
 }
+sub updateBranch(){
+	open my $in, '<', ".legit/branch.txt" or die "Could no open branch.txt\n";
+	open my $out, '>', ".legit/branch.txt.temp" or die "Can't write new file: $!";
 
+	while (my $line = <$in>){
+		my @B = split(':',$line);
+		if($B[0] =~ m/ - /){
+			my @nam = split(' - ',$B[0]);
+			print $out "1 - $nam[1]:Commit_$_[0]\n";
+		}
+		else{
+			print $out "$line";
+		}
+	}
+	close $in;
+	close $out;
+	rename (".legit/branch.txt.temp", ".legit/branch.txt") or die "Unable to rename: $!";
+	return;
+}
 sub printBranch{
 	open my $br,'<',".legit/branch.txt" or die "Could not open branch.txt\n";
 	
@@ -840,6 +867,20 @@ sub printBranch{
 	return;
 }
 
+sub getBranch{
+	open my $br,'<',".legit/branch.txt" or die "Could not open branch.txt\n";
+	
+	while(my $line = <$br>){
+		my @act = split(':',$line);
+		if($act[0] =~ m/ - /){
+			my @cho = split('_',$act[1]);
+			my $result = $cho[1] =~ s/\n//gr;
+			return $result;
+		}
+	}
+	close $br;
+	return 0;
+}
 sub existsBranch{
 	open my $br,'<',".legit/branch.txt" or die "Could not open branch.txt\n";
 	
@@ -916,6 +957,46 @@ sub createBranch{
 	return;
 }
 
+
+sub unMerge{
+	open my $br,'<',".legit/branch.txt" or die "Could not open branch.txt\n";
+	
+	my $result = "";
+	while(my $line = <$br>){
+		my @ac = split(':',$line);
+		if($ac[0] =~ m/ - /){
+			my @ch = split(' - ',$ac[0]);
+			if($ch[1] eq $_[0]){
+				$result = $ac[1];
+				chomp $result;
+				last;
+			}
+		}
+		else{
+			if($ac[0] eq $_[0]){
+				$result = $ac[1];
+				chomp $result;
+				last;
+			}
+		}
+	}
+	close $br;
+	
+	#print "$result\n";
+	if($result ne ""){
+		my $dir = getcwd;
+		foreach my $file(glob("$dir/*")){
+			my @filename = split('/',$file);
+			if(-e ".legit/repository/$result/$filename[$#filename]"){
+				next;
+			}
+			else{
+				return 1;
+			}
+		}
+	}
+	return 0;
+}
 sub deleteBranch{
 	if(existsBranch($_[0]) == 0){
 		print "legit.pl: error: branch '$_[0]' does not exist\n";
@@ -940,6 +1021,10 @@ sub deleteBranch{
 You are not required to detect this error or produce this error message.\n";
 				exit 1;
 			}
+			elsif(unMerge($_[0]) == 1){
+				print "legit.pl: error: branch '$_[0]' has unmerged changes\n";
+				exit 1;
+			}
 			else{
 				print $out "$line";	
 			}
@@ -955,5 +1040,86 @@ You are not required to detect this error or produce this error message.\n";
 	close $out;
 	rename (".legit/branch.txt.temp", ".legit/branch.txt") or die "Unable to rename: $!";
 	print "Deleted branch '$_[0]'\n";
+	return;
+}
+
+sub checkWork{
+	#print "$_[0],$_[1]\n";
+	foreach my $file(glob(".legit/repository/$_[0]/*")){
+		my @files = split('/',$file);
+		#print "$file\n";
+		#print "$files[$#files]\n";
+		if(-e ".legit/repository/$_[1]/$files[$#files]"){
+			next;
+		}
+		else{
+			if(-e $files[$#files]){
+				unlink $files[$#files];
+			}
+		}
+	}
+	
+	if($_[0] ne $_[1]){
+		my $dir = getcwd;
+		foreach my $f(glob(".legit/repository/$_[1]/*")){
+			#print "$f\n";
+			my @filename = split('/',$f);
+			if(-e "$dir/$filename[$#filename]"){
+				if(DiffCI($filename[$#filename]) == 1 && DiffIR($filename[$#filename]) == 0){
+					print "legit.pl: error: Your changes to the following files would be overwritten by checkout:\n$filename[$#filename]\n";
+					unlink ".legit/branch.txt.temp";
+					exit 1;
+				}
+			}
+			copy($f,$dir) or die "Could not copy $f\n";
+			copy($f,".legit/index") or die "Could not copy $f\n";
+		}
+	}
+	return;
+}
+
+sub switch{
+	if(existsBranch($_[0]) == 0){
+		print "legit.pl: error: unknown branch '$_[0]'\n";
+		exit 1;
+	}
+	
+	my $target = "";
+	my $currentB = "";
+	open my $in, '<', ".legit/branch.txt" or die "Could no open branch.txt\n";
+	open my $out, '>', ".legit/branch.txt.temp" or die "Can't write new file: $!";
+
+	while (my $line = <$in>){
+		my @B = split(':',$line);
+		if($B[0] =~ m/ - /){
+			my @nam = split(' - ',$B[0]);
+			if($nam[1] eq $_[0]){
+				print "Already on '$_[0]'\n";
+				exit 1;
+			}
+			else{
+				$currentB = $B[1];
+				print $out "$nam[1]:$B[1]";
+			}
+		}
+		elsif($B[0] eq $_[0]){
+			$target = $B[1];
+			print $out "1 - $B[0]:$B[1]";
+		}
+		else{
+			print $out "$line";
+		}
+	}
+	close $in;
+	close $out;
+	#rename (".legit/branch.txt.temp", ".legit/branch.txt") or die "Unable to rename: $!";
+	
+	if($target ne "" && $currentB ne ""){
+		chomp $target;
+		chomp $currentB;
+		checkWork($currentB,$target);
+	}
+	rename (".legit/branch.txt.temp", ".legit/branch.txt") or die "Unable to rename: $!";
+	print "Switched to branch '$_[0]'\n";	
 	return;
 }
