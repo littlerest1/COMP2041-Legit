@@ -982,18 +982,42 @@ sub unMerge{
 	}
 	close $br;
 	
-	#print "$result\n";
+	my $flag = 0;
 	if($result ne ""){
-		my $dir = getcwd;
-		foreach my $file(glob("$dir/*")){
-			my @filename = split('/',$file);
-			if(-e ".legit/repository/$result/$filename[$#filename]"){
-				next;
+		my @no = split('_',$result);
+		
+		open my $fh,'<',".legit/branch.txt" or die "Could not open branch.txt\n";
+		
+		while(my $lines = <$fh>){
+			my @ac = split(':',$lines);
+			chomp $ac[1];
+			if($ac[0] =~ m/ - /){
+				my @ch = split(' - ',$ac[0]);
+
+				my @temp = split('_',$ac[1]);
+				if($ch[1] eq $_[0]){
+					next;
+				}
+				elsif($temp[1] >= $no[1]){
+					$flag = 1;
+					last;
+				}
 			}
 			else{
-				return 1;
+				my @temp = split('_',$ac[1]);
+				if($ac[0] eq $_[0]){
+					next;
+				}
+				elsif($temp[1] >= $no[1]){
+					$flag = 1;
+					last;
+				}
 			}
 		}
+	    close $fh;
+	}
+	if($flag == 0){
+		return 1;
 	}
 	return 0;
 }
