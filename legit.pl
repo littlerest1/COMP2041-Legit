@@ -839,7 +839,8 @@ sub updateBranch(){
 		my @B = split(':',$line);
 		if($B[0] =~ m/ - /){
 			my @nam = split(' - ',$B[0]);
-			print $out "1 - $nam[1]:Commit_$_[0]\n";
+			chomp $B[1];
+			print $out "1 - $nam[1]:Commit_$_[0]/$B[1]\n";
 		}
 		else{
 			print $out "$line";
@@ -873,7 +874,9 @@ sub getBranch{
 	while(my $line = <$br>){
 		my @act = split(':',$line);
 		if($act[0] =~ m/ - /){
-			my @cho = split('_',$act[1]);
+			chomp $act[1];
+			my @b = split('/',$act[1]);
+			my @cho = split('_',$b[0]);
 			my $result = $cho[1] =~ s/\n//gr;
 			return $result;
 		}
@@ -914,23 +917,16 @@ sub createBranch{
 	while(my $line = <$FH>){
 		my @a = split(':',$line);
 		if($a[0] =~ m/ - /){
-			my @c = split(' - ',$a[0]);
-			if($c[1] eq "master"){
-				$master = $a[1];
-				last;
-			}
-		}
-		else{
-			if($a[0] eq "master"){
-				$master = $a[1];
-				last;
-			}
+			chomp $a[1];
+			my @c = split('/',$a[1]);
+			$master = $c[0];
+			last;
 		}
 	}
 	close $FH;
 	
 	open(my $F,'>>',".legit/branch.txt") or die "Could not open branch.txt:$!";
-	print $F "$_[0]:$master";
+	print $F "$_[0]:$master\n";
 	close $F;
 	
 	my %hash;
@@ -967,15 +963,17 @@ sub unMerge{
 		if($ac[0] =~ m/ - /){
 			my @ch = split(' - ',$ac[0]);
 			if($ch[1] eq $_[0]){
-				$result = $ac[1];
-				chomp $result;
+				chomp $ac[1];
+				my @b = split('/',$ac[1]);
+				$result = $b[0];
 				last;
 			}
 		}
 		else{
 			if($ac[0] eq $_[0]){
-				$result = $ac[1];
-				chomp $result;
+				chomp $ac[1];
+				my @b = split('/',$ac[1]);
+				$result = $b[0];
 				last;
 			}
 		}
@@ -993,8 +991,9 @@ sub unMerge{
 			chomp $ac[1];
 			if($ac[0] =~ m/ - /){
 				my @ch = split(' - ',$ac[0]);
-
-				my @temp = split('_',$ac[1]);
+				chomp $ac[1];
+				my @b = split('/',$ac[1]);
+				my @temp = split('_',$b[0]);
 				if($ch[1] eq $_[0]){
 					next;
 				}
@@ -1004,7 +1003,9 @@ sub unMerge{
 				}
 			}
 			else{
-				my @temp = split('_',$ac[1]);
+				chomp $ac[1];
+				my @b = split('/',$ac[1]);
+				my @temp = split('_',$b[0]);
 				if($ac[0] eq $_[0]){
 					next;
 				}
@@ -1122,13 +1123,17 @@ sub switch{
 				exit 1;
 			}
 			else{
-				$currentB = $B[1];
-				print $out "$nam[1]:$B[1]";
+				chomp $B[1];
+				my @b = split('/',$B[1]);
+				$currentB = $b[0];
+				print $out "$nam[1]:$B[1]\n";
 			}
 		}
 		elsif($B[0] eq $_[0]){
-			$target = $B[1];
-			print $out "1 - $B[0]:$B[1]";
+			chomp $B[1];
+			my @b = split('/',$B[1]);
+			$target = $b[0];
+			print $out "1 - $B[0]:$B[1]\n";
 		}
 		else{
 			print $out "$line";
@@ -1139,8 +1144,6 @@ sub switch{
 	#rename (".legit/branch.txt.temp", ".legit/branch.txt") or die "Unable to rename: $!";
 	
 	if($target ne "" && $currentB ne ""){
-		chomp $target;
-		chomp $currentB;
 		checkWork($currentB,$target);
 	}
 	rename (".legit/branch.txt.temp", ".legit/branch.txt") or die "Unable to rename: $!";
