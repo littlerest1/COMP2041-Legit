@@ -9,6 +9,7 @@ use Scalar::Util qw(looks_like_number);
 use autodie;
 use v5.10;
 
+#command entries
 if($#ARGV <= -1){
 	print "Usage: legit.pl <command> [<args>]\n\n";
 	print "These are the legit commands:\n";
@@ -58,7 +59,13 @@ elsif($ARGV[0] eq "show"){
 		print "usage: legit.pl show <commit>:<filename>\n";
 		exit 1;
 	}
-	show();
+	if($ARGV[1] =~ m /:/){
+		show();
+	}
+	else{
+		print "usage: legit.pl show <commit>:<filename>\n";
+		exit 1;
+	}
 }
 
 elsif($ARGV[0] eq "log"){
@@ -165,6 +172,7 @@ else{
    merge      Join two development histories together\n\n";
 	exit 1;
 }
+
 #functions for each command
 
 #get the current repository
@@ -182,6 +190,7 @@ sub getRepo{
 	}
 	return $curr;
 }
+
 #check whether initialize legit or not
 sub checkinit{
 	if(-e ".legit"){
@@ -202,7 +211,7 @@ sub checkrepo{
 	}
 	return;
 }
-
+#check whether has any thing in index
 sub checkindex{
     opendir(my $dh, ".legit/index") or die "Not a directory";
 	if(scalar(grep { $_ ne "." && $_ ne ".." } readdir($dh)) == 0 && -z ".legit/log.txt"){
@@ -212,6 +221,7 @@ sub checkindex{
 			
 	return;
 }
+
 #init function creates folder:.legit/index/log.txt/repository
 sub Initialize{
 	my $directory = ".legit";
@@ -261,6 +271,8 @@ sub Initialize{
 }
 
 #add file to index folder
+#copy all files in current directory to index folder also if file is deleted by system which is in current directory but not index 
+#should throw it into bin and delete it in index
 sub addFile{
 	my $directory = ".legit/index";
 	if(-e $directory){
@@ -272,7 +284,6 @@ sub addFile{
 		}
 		my $args = 1;
 		while($args <= $#ARGV){
-			#print "$ARGV[$args],$#ARGV,$args\n";	
 			if(-d $ARGV[$args]){
 				print "legit.pl: error: '$ARGV[$args]' is not a regular file\n";
 				exit 1;
@@ -281,7 +292,6 @@ sub addFile{
 				copy($ARGV[$args],$directory) or die "legit.pl: error: can not open '$ARGV[$args]'\n";
 			}
 			elsif(-e ".legit/index/$ARGV[$args]"){
-			#	print "unlink\n";
 				copy(".legit/index/$ARGV[$args]",".legit/bin/$ARGV[$args]") or die "legit.pl: error: can not open '/bin/$ARGV[$args]'\n";
 			    unlink ".legit/index/$ARGV[$args]";
 			}
@@ -301,7 +311,9 @@ sub addFile{
 #copy file from index folder to repository folder
 sub commit{
 	#print "message:$ARGV[2]\n";
-	
+	#if has no commit which means this is the first commit
+	#else needs check the changes between files in this and previous commit
+	#if the file is changed should commit as new commit and copy all files from index to new commit folder also change the log of legit and status of file
 	if(-z ".legit/log.txt"){
 		my $commit = ".legit/repository/Commit_0";
 		unless(mkdir($commit)) {
@@ -323,8 +335,6 @@ sub commit{
 	#		print $data;
 	#	} 
 	#	close($status);
-		
-		
 		
 		
 		my $directory = ".legit/index";
@@ -459,6 +469,7 @@ sub commit{
 	return;
 }
 
+#changes state after commit
 sub changeState{
 #	print "$_[0]\n";
 	open my $input,".legit/status.txt" or die "Could not open status.txt:$!";
@@ -597,7 +608,7 @@ sub show{
 	}
 	return;
 }
-
+#commit all function which needs to update the index folder before commit
 sub commitAll{
 	foreach my $file((glob(".legit/index/*"))){
 		my @files = split ('/',$file);
@@ -616,8 +627,8 @@ sub commitAll{
     return;
 }
 
-
-
+#remove function has 4 condition
+#each condition needs the file satisfied the remove roles for remove
 sub remove{
 	my $flag = 0;
 	my $f2 = 0;
@@ -732,6 +743,7 @@ sub remove{
 	return;
 }
 
+#check the file in both index and current branch latest repository
 sub DiffIR{
 	if(-e ".legit/index/$_[0]"){
 		my $curr = getBranch();
@@ -739,6 +751,7 @@ sub DiffIR{
 	}
 	return 0;
 }
+#usually check the file whether is only add but not commit
 sub InRepo{
 	#print "$_[0]\n";
 	my $firstLine;
@@ -762,6 +775,7 @@ sub InRepo{
 	return 0;
 }
 
+#check the file in both current directory and index 
 sub DiffCI{
 	if(-e "$_[0]" && -e ".legit/index/$_[0]"){
 		return compare(".legit/index/$_[0]","$_[0]");
@@ -769,7 +783,7 @@ sub DiffCI{
 	return 1;
 }
 
-
+#update status rearrange the status.txt makes suits alphabet order
 sub updateS{
 	my $dir = getcwd;
 	foreach my $file (glob("$dir/*")){
@@ -810,6 +824,7 @@ sub updateS{
 	return;
 }
 
+#check whether this commit is make by this current branch
 sub inlist{
 #	print "inlist=$_[0]\n";
 	open my $list,'<',".legit/status.txt" or die "Could not open status.txt:$!";
@@ -823,7 +838,7 @@ sub inlist{
 	close $list;
 	return 0;
 }
-
+#status main function for update the current status and print out the files status
 sub status{
 	open my $input,".legit/status.txt" or die "Could not open status.txt:$!";
 	
@@ -898,6 +913,8 @@ sub status{
 	close $out;
 	return;
 }
+
+#remark the current branch after switch branch
 sub updateBranch{
 	open my $in, '<', ".legit/branch.txt" or die "Could no open branch.txt\n";
 	open my $out, '>', ".legit/branch.txt.temp" or die "Can't write new file: $!";
@@ -918,6 +935,8 @@ sub updateBranch{
 	rename (".legit/branch.txt.temp", ".legit/branch.txt") or die "Unable to rename: $!";
 	return;
 }
+
+#print exists branches
 sub printBranch{
 	open my $br,'<',".legit/branch.txt" or die "Could not open branch.txt\n";
 	
@@ -935,6 +954,7 @@ sub printBranch{
 	return;
 }
 
+#get the current branch
 sub getBranch{
 	open my $br,'<',".legit/branch.txt" or die "Could not open branch.txt\n";
 	
@@ -952,6 +972,8 @@ sub getBranch{
 
 	return 0;
 }
+
+#check whether the branch exists
 sub existsBranch{
 	open my $br,'<',".legit/branch.txt" or die "Could not open branch.txt\n";
 	
@@ -974,6 +996,8 @@ sub existsBranch{
 	close $br;
 	return 0;
 }
+
+#create branch function add the branch to branch file and mark the current latest commit as first commit for new branch also rearrange the file 
 sub createBranch{
 	if(existsBranch($_[0]) == 1){
 		print "legit.pl: error: branch '$_[0]' already exists\n";
@@ -1021,7 +1045,7 @@ sub createBranch{
 	return;
 }
 
-
+#check whether the branch has unMerge files
 sub unMerge{
 	open my $br,'<',".legit/branch.txt" or die "Could not open branch.txt\n";
 	
@@ -1090,6 +1114,8 @@ sub unMerge{
 	}
 	return 0;
 }
+
+#delete branch check branch status then consider the deletion
 sub deleteBranch{
 	if(existsBranch($_[0]) == 0){
 		print "legit.pl: error: branch '$_[0]' does not exist\n";
@@ -1136,6 +1162,7 @@ You are not required to detect this error or produce this error message.\n";
 	return;
 }
 
+#check overwritten for file in switch command
 sub checkWork{
 	#print "$_[0],$_[1]\n";
 	foreach my $file(glob(".legit/repository/$_[0]/*")){
@@ -1170,7 +1197,7 @@ sub checkWork{
 	}
 	return;
 }
-
+#switch branch checkout command main function if checkout successful then change target branch to current branch
 sub switch{
 	if(existsBranch($_[0]) == 0){
 		print "legit.pl: error: unknown branch '$_[0]'\n";
@@ -1219,6 +1246,8 @@ sub switch{
 	return;
 }
 
+#merge function first consider whether the file is need to merge or only needs to point to specific commit
+#then try to merge 2 files if merge successful commit and save the change 
 sub merge{
 	#print "$_[0],$_[1]\n";
 	open my $br,'<',".legit/branch.txt" or die "Could not open branch.txt\n";
@@ -1244,6 +1273,7 @@ sub merge{
 
 	my $f1 = 0;
 	my $flag = 0;
+	my @avoid;
 #	print("current = $curr[0],targetnow = $tar[0]\n");
 	if($curr[0] eq $tar[0]){
 		print "Already Up to date\n";
@@ -1270,6 +1300,7 @@ sub merge{
 							print $rewrite "$elem";
 						}
 						close $rewrite;
+						
 						copy("$dir/$filename[$#filename]",".legit/index") or die "Could not cooy $file\n";
 						print "Auto-merging $filename[$#filename]\n";
 						
@@ -1307,6 +1338,13 @@ sub merge{
 						exit 1;
 					}
 				}
+				elsif($flag == 1 && compare(".legit/repository/$curr[0]/$filename[$#filename]",".legit/repository/$tar[0]/$filename[$#filename]") == 1){	
+					my $dir = getcwd;
+					#print".legit/repository/$tar[0]/$filename[$#filename]\n";
+					copy(".legit/repository/$tar[0]/$filename[$#filename]",$dir) or die "Could not copy .legit/repository/$tar[0]/$filename[$#filename]\n";
+					copy("$dir/$filename[$#filename]",".legit/index") or die "Could not cooy $file\n";
+					print "Auto-merging $filename[$#filename]\n";
+				}
 			}
 		}
 	}
@@ -1332,10 +1370,16 @@ sub merge{
 	}
 	if($flag == 1){
 		commitAll($_[1]);
+		my $latest = getRepo();
+		my $dir = getcwd;
+		foreach my $fls(glob(".legit/repository/Commit_$latest/*")){
+			copy($fls,$dir) or die "Could not copy $fls\n";
+		}
 	}
 	return;
 }
 
+#try to merge 2 file
 sub tryMerge{
 	#print "$_[0],$_[1],\n ori = $_[2]\n";
 	open my $f1,$_[0] or die "Could not open $_[0]\n";
@@ -1418,8 +1462,16 @@ sub tryMerge{
 			}
 			elsif($all2[$comp] ne $origin[$comp] && $all1[$comp] ne $origin[$comp]){
 				if($origin[$comp] eq ""){
-					$returns[$comp] = $all1[$comp];
-					$returns[$comp++] = $all2[$comp];
+					my $t = $comp + 1;
+					my $e = $comp - 1;
+					if($all2[$comp] eq $origin[$e]){
+						$returns[$comp] = $all2[$comp];
+						$returns[$t] = $all1[$comp];
+					}
+					else{
+						$returns[$comp] = $all1[$comp];
+						$returns[$t] = $all2[$comp];
+					}
 					last;
 				}
 				else{
@@ -1438,7 +1490,7 @@ sub tryMerge{
 	return @returns;
 	
 }
-
+#check whether 2 files are need to merge or not
 sub judge{
 	open my $f1,$_[0] or die "Could not open $_[0]\n";
 	open my $f2,$_[1] or die "Could not open $_[1]\n";
@@ -1462,6 +1514,7 @@ sub judge{
 	close $f2;
 
 	#print"count = $count,num = $num\n";
+	my $flag = 0;
 	if(@all1 && @all2){
 		if($num == $count){
 			my $comp = $num - 1;
@@ -1474,24 +1527,52 @@ sub judge{
 			
 		}
 		elsif($num > $count){
-			my $comp = $count - 1;
-			while($comp > 0){
-				if($all1[$comp] ne $all2[$comp]){
-					return 1;
+			my $minus = $num - $count;
+			#print "minues = $minus\n";
+			while($count >= 0 && $num >= 0){
+				my $my1 = pop @all1;
+				my $my2 = pop @all2;
+				if (defined $my1 && defined $my2){
+					if(($my1 cmp $my2) != 0){
+						#print "$my1,$my2\n";
+						$flag ++;
+						$num --;
+						$my2 = pop @all2;
+						next;
+					}
 				}
-				$comp --;
+				$num --;
+				$count --;
+			}
+			#print "flag = $flag\n";
+			if($minus == $flag){
+				return 0;
 			}
 		}
 		else{
-			my $comp = $num - 1;
-			while($comp > 0){
-				if($all1[$comp] ne $all2[$comp]){
-					return 1;
+			my $minus = $count - $num;
+			while($count >= 0 && $num >= 0){
+				my $my1 = pop @all1;
+				my $my2 = pop @all2;
+				if (defined $my1 && defined $my2){
+					if(($my1 cmp $my2) != 0){
+						#print "$my1,$my2\n";
+						$flag ++;
+						$count --;
+						$my1 = pop @all1;
+						next;
+					}
 				}
-				$comp --;
+				$num --;
+				$count --;
+			}
+			if($minus == $flag){
+				return 0;
 			}
 		}
 	}
-
-	return 0;
+	if($flag == 0 || $flag == 1){
+		return 0;
+	}
+	return 1;
 }
