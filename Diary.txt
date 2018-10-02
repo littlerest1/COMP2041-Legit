@@ -1,0 +1,75 @@
+Date  				Start 				End 				Activity							Comments
+19/09/18 			17:00				22:30				Coding 						Roughly finish subset0.
+
+20/09/18			11:30				15:03				Coding,Testing				Finished subset0,passed autotest
+
+21/09/18			16:30				23:30				Researching,Coding			Understand rm command and do simple functions
+
+22/09/18			13:30				16:20				Coding 						Could not pass the subset1_13 autotest for remove command
+
+23/09/18			11:00 				16:20				Researching,Coding			rewrite the whole functions for remove and some 
+																						of the test functions.			
+
+24/09/18			11:00				17:00				Coding						The program works for subset1_13 but fail for subset1_11 and 12
+
+26/09/18			11:30				23:30				Coding						Solve the problem and start doing subset2
+
+27/09/18			11:30				16:20				Coding						Fixing the checkout command bugs.
+
+28/09/18 			11:30				13:00				Coding						Except merge.
+1/10/18				10:30              23:00				Coding,researching 			Try to write merge.
+2/10/18				10:45				15:30				Coding,debugging,test writing				Finishing merge,except some case,write test files
+2/10/18				20:00				23:30				Debugging,testing			Still not get the merge right,but find some bugs in merge
+
+19/09/18 
+Start doing assignment 1.Coded for subset 0.Since a lot of confusing about the error handling and data structure about legit.
+Use plenty of time for check and test with legit in cse machine.Also,roughly finish subset0.
+
+20/09/18
+Tracking autotest in cse machine with my code.Based on the fail test result,fix the bugs.
+At 15:03,finally finish subset0.Note:a lot of uninitialize problem is happens when the condition is not clear.It might be opening
+or assign in a null or empty file.
+
+21/09/18
+Start coding for subset1.First of all,understand the meaning of the command and what willing me to do for this command.
+For comment [-a] -m message : update all the files in index folder(commited) compare to the same file in current directory.
+For rm [--force][--cached] filenames : 
+command: rm --force --cached a:
+	a is in repository:
+	if a is in repository,deleted a in both (index and repository folder) without checking the status of a
+command: rm --cached --force a:
+	same as above
+command: rm --cached --force c:
+	c is in index but not in repository
+	c going to untracked status
+The meaning of rm command:if the user upload his/her works into repository,the works can be removed from index folder and current
+directory if there are no changes in current directory.However if user use force option it will delete from index folder without checking.
+The --cached option,only removed the files in index folder but not current directory.
+
+For status command: This command is for all the files in the current directory
+status deleted: delete via legit(may found in repository?)
+	file deleted:delete from file system
+
+22/09/18
+Could not pass the subset1_13 autotest for remove command,it's about add a file after removal,very confusing for that test.
+
+23/09/18
+Understand what does it means for add and commit after removal. Depend on that,I found out my previous implementation
+about commit and add is not good for further implementation.I need to rewrite the whole functions for that and some 
+of the test functions.
+
+24/09/18
+The program works for subset1_13 but fail for subset1_11 and 12.Still finding a solution for that problem.
+
+25/09/18
+Going to Blue Mountain with High school friends.One day off ^-^.
+
+26/09/18
+Solve the problem,and going to status part for subet 1.Finished subset1 in 20:56.Starting subset2 in 22:00.Finished branch command and starting for 
+checkout command before I am going
+to sleep.
+
+27/09/18
+Fixing the checkout command bugs.However in subset2_23 autotest,It runs correct output in my computer terminal.However it has different output in cse machine.
+I can sure they are the same code.Also, I find out if I write $a = chomp $b it returns 1 which means is success. If I want to get $b without newline. I should 
+only write chomp $b.

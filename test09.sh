@@ -11,4 +11,14 @@ var=$(./legit.pl checkout master)
 comp=$(sed -i 4d c)
 var=$(./legit.pl commit -a -m commit-2)
 var=$(./legit.pl merge -m merge1 b1)
-echo $var
+comp=$(echo "Auto-merging c")
+if [[ $var == $comp ]]
+	then
+		rm -rf ".legit"
+		rm "c"
+		echo "Merge pass"
+else
+	rm -rf ".legit"
+	rm "c"
+	echo "Merge failed"
+fi
