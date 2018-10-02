@@ -511,6 +511,27 @@ sub checksame{
 
 #print commit message functions(print log.txt)
 sub printCommit{
+	open my $br,'<',".legit/branch.txt" or die "Could not open branch.txt\n";
+	
+	my @result;
+	while(my $line = <$br>){
+		my @act = split(':',$line);
+		if($act[0] =~ m/ - /){
+			chomp $act[1];
+			@result = split('/',$act[1]);
+		}
+	}
+	close $br;
+	
+	my @co;
+	foreach my $commit(@result){
+		my @temp = split('_',$commit);
+		#print "$temp[1]\n";
+		push @co,$temp[1]; 
+	}
+	push @co,"0";
+	#print "$#co\n";
+	
 	if(-e ".legit/log.txt"){
 		if(-z ".legit/log.txt"){
 			print "legit.pl: error: your repository does not have any commits yet\n";
@@ -518,8 +539,16 @@ sub printCommit{
 		}
 		open my $fh, ".legit/log.txt" or die "Could not open:.legit/log.txt";
 		
-		while( my $line = <$fh> ) {
-			print "$line";
+		my $count = 0;
+		while( my $lines= <$fh>) {
+			if($count >  $#co){
+				last;
+			}
+			my @a = split(' ',$lines);
+			if($a[0] eq $co[$count]){
+				print "$lines";
+				$count ++;
+			}
 		}
 		close $fh;
 	}
@@ -1207,12 +1236,14 @@ sub merge{
 			$target = $act[1];
 		}
 	}
+	close $br;
 #	print("curr = $current,target = $target\n");
 	my @curr = split('/',$current);
 	my @tar = split('/',$target);
 
 
 	my $f1 = 0;
+	my $flag = 0;
 #	print("current = $curr[0],targetnow = $tar[0]\n");
 	if($curr[0] eq $tar[0]){
 		print "Already Up to date\n";
@@ -1224,7 +1255,13 @@ sub merge{
 			if(-e ".legit/repository/$curr[0]/$filename[$#filename]"){
 				if(judge(".legit/repository/$curr[0]/$filename[$#filename]",$file) == 1){
 					$f1 = 1;
-					my @returns = tryMerge(".legit/repository/$curr[0]/$filename[$#filename]",$file,".legit/repository/$tar[$#tar]/$filename[$#filename]");
+					my @returns;
+					if($curr[0] gt $tar[$#tar]){
+						@returns = tryMerge(".legit/repository/$curr[0]/$filename[$#filename]",$file,".legit/repository/$tar[$#tar]/$filename[$#filename]");
+					}
+					else{
+						@returns = tryMerge(".legit/repository/$tar[$#tar]/$filename[$#filename]",$file,".legit/repository/$curr[0]/$filename[$#filename]");
+					}
 					if(@returns){
 						my $dir = getcwd;
 						open my $rewrite,'>',"$dir/$filename[$#filename]" or die "Could not rewrite .legit/repository/$curr[0]/$filename[$#filename]\n";
@@ -1235,7 +1272,35 @@ sub merge{
 						close $rewrite;
 						copy("$dir/$filename[$#filename]",".legit/index") or die "Could not cooy $file\n";
 						print "Auto-merging $filename[$#filename]\n";
-						commitAll($_[1]);
+						
+						my %hash;
+						foreach my $temp(@curr){
+							$hash{$temp} = 0;
+						}
+						foreach my $temp(@tar){
+							$hash{$temp} = 0;
+						}
+						
+						open my $in,'<',".legit/branch.txt" or die "Can't open file $!";
+						open my $out, '>', ".legit/branch.txt.temp" or die "Can't write new file: $!";
+						
+						while(my $l = <$in>){
+							my @sp = split(':',$l);
+							if($l =~ m / - /){
+								print $out "$sp[0]:";
+								foreach my $key(reverse sort keys %hash){
+									print $out "$key/";
+								}
+								print $out "\n";
+							}
+							else{
+								print $out $l;
+							}
+						}
+						close $in;
+						close $out;
+						rename (".legit/branch.txt.temp", ".legit/branch.txt") or die "Unable to rename: $!";
+						$flag = 1;
 					}
 					else{
 						print "legit.pl: error: These files can not be merged:\n$filename[$#filename] \n";
@@ -1264,6 +1329,9 @@ sub merge{
 		}
 		print "Fast-forward: no commit created\n";
 		exit 1;
+	}
+	if($flag == 1){
+		commitAll($_[1]);
 	}
 	return;
 }
@@ -1305,27 +1373,67 @@ sub tryMerge{
 	my $flag = 0;
 	my @returns;
 	
+	my $c = 0;
 	if(@all1 && @origin && @all2){
-		if($num == $original && $count == $original){
-			my $comp = 0;
-			while($comp < $num){
-				if($all1[$comp] ne $origin[$comp] && $all2[$comp] eq $origin[$comp]){
+		if($num >= $original && $num >= $count){
+			$c = $num;
+			while($original <= $num){
+				$origin[$original] = "";
+				$original ++;
+			}
+			while($count <= $num){
+				$all1[$count] = "";
+				$count ++;
+			}
+		}
+		elsif($count >= $original &&$count >= $num){
+			$c = $count;
+			while($original <= $count){
+				$origin[$original] = "";
+				$original ++;
+			}
+			while($num <= $count){
+				$all2[$num] = "";
+				$num ++;
+			}
+		}
+		else{
+			$c = $original;
+			while($count <= $original){
+				$all1[$count] = "";
+				$count ++;
+			}
+			while($num <= $original){
+				$all2[$num] = "";
+				$num ++;
+			}
+		}
+		my $comp = 0;
+		while($comp < $c){
+			if($all1[$comp] ne $origin[$comp] && $all2[$comp] eq $origin[$comp]){
+				$returns[$comp] = $all1[$comp];
+			}
+			elsif($all2[$comp] ne $origin[$comp] && $all1[$comp] eq $origin[$comp]){
+				$returns[$comp] = $all2[$comp];
+			}
+			elsif($all2[$comp] ne $origin[$comp] && $all1[$comp] ne $origin[$comp]){
+				if($origin[$comp] eq ""){
 					$returns[$comp] = $all1[$comp];
-				}
-				elsif($all2[$comp] ne $origin[$comp] && $all1[$comp] eq $origin[$comp]){
-					$returns[$comp] = $all2[$comp];
-				}
-				elsif($all2[$comp] ne $origin[$comp] && $all1[$comp] ne $origin[$comp]){
-					print "legit.pl: error: These files can not be merged:\n$filename[$#filename] \n";
-						exit 1;
+					$returns[$comp++] = $all2[$comp];
+					last;
 				}
 				else{
-					$returns[$comp] = $origin[$comp];
+					print "legit.pl: error: These files can not be merged:\n$filename[$#filename] \n";
+					exit 1;
 				}
-				$comp ++;
 			}
-			
+			else{
+				$returns[$comp] = $origin[$comp];
+			}
+			$comp ++;
 		}
+			
+
 	}
 	return @returns;
 	
